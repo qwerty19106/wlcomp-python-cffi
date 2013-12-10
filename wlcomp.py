@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from bitstring import Bits, BitArray
 from cffi import FFI
 
 ffi = FFI()
@@ -64,6 +65,8 @@ typedef struct
 } SLOT_PAR;
 
 unsigned int GetSlotParam(LDevice* hIfc, SLOT_PAR* slPar);
+
+unsigned int EnableCorrection(LDevice* hIfc, unsigned short Ena);
 ''')
 
 _dll = ffi.dlopen("libwlcomp.so")
@@ -96,6 +99,7 @@ class LDeviceError(Exception):
 
 
 class LDevice:
+    #Обертка над C API
     def __init__(self, slot):
         err = ffi.new("unsigned int*")
         device = _dll.CreateLDevice(0, err)
@@ -152,13 +156,43 @@ class LDevice:
 
     def io_async(self, WASYNC_PAR):
         if _dll.IoAsync(self._impl, WASYNC_PAR) == L_ERROR:
-            raise LDeviceError("StopLDevice error")
+            raise LDeviceError("IoAsync error")
 
     def get_slot_param(self):
         sp = ffi.new("SLOT_PAR*")
         if _dll.GetSlotParam(self._impl, sp) == L_ERROR:
             raise LDeviceError("GetSlotParam error")
         return sp
+
+    def enable_correction(self, val):
+        assert type(val) == bool
+        if _dll.EnableCorrection(self._impl, int(val)) == L_ERROR:
+            raise LDeviceError("EnableCorrection error")
+
+    #Пользовательские функции
+    def ttl_write(self, bits):
+        assert type(bits) in (Bits, BitArray)
+        assert len(bits) == 16
+        sp = self.create_WASYNC_PAR()
+        sp.s_Type = L_ASYNC_TTL_OUT
+        sp.Data[0] = bits.uint
+        self.io_async(sp)
+
+    def ttl_read(self):
+        sp = self.create_WASYNC_PAR()
+        sp.s_Type = L_ASYNC_TTL_INP
+        self.io_async(sp)
+        return Bits(uint=sp.Data[0], length=16)
+
+    def adc_get(self, num):
+        assert (num >= 0) and (num < 16)
+        sp = self.create_WASYNC_PAR()
+        sp.s_Type = L_ASYNC_ADC_INP
+        sp.Chn[0] = num
+        self.io_async(sp)
+
+        value = Bits(uint=sp.Data[0], length=16)
+        return value.int
 
 
 def main():
@@ -177,10 +211,15 @@ def main():
         print("DSPType ", sp.DSPType)
         print("Irq     ", sp.Irq)
 
-        sp = device.create_WASYNC_PAR()
-        sp.s_Type = L_ASYNC_TTL_INP
-        device.io_async(sp)
-        print(sp.Data[0])
+        print(device.ttl_read().bin)
+        print(device.ttl_read()[4])
+
+        ttl = BitArray(uint=0, length=16)
+        ttl[5] = 1
+        device.ttl_write(ttl)
+
+        device.enable_correction(True)
+        print(device.adc_get(4))
     finally:
         device.close()
 
