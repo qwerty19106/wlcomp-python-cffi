@@ -6,22 +6,21 @@ from cffi import FFI
 ffi = FFI()
 
 ffi.cdef('''
-typedef struct { int dummy; } LDevice;
+struct LDevice;
 
-LDevice* CreateLDevice(unsigned int Slot, unsigned int* err);
-void ReleaseLDevice(LDevice* hifc);
+struct LDevice* CreateLDevice(unsigned int Slot, unsigned int* err);
+void ReleaseLDevice(struct LDevice* hIfc);
 
-unsigned int PlataTest(LDevice* hifc);
+unsigned int PlataTest(struct LDevice* hIfc);
 
-unsigned int OpenLDevice(LDevice* hifc);
-unsigned int CloseLDevice(LDevice* hifc);
+unsigned int OpenLDevice(struct LDevice* hIfc);
+unsigned int CloseLDevice(struct LDevice* hIfc);
 
-unsigned int InitStartLDevice(LDevice* hifc);
-unsigned int StartLDevice(LDevice* hifc);
-unsigned int StopLDevice(LDevice* hifc);
+unsigned int InitStartLDevice(struct LDevice* hIfc);
+unsigned int StartLDevice(struct LDevice* hIfc);
+unsigned int StopLDevice(struct LDevice* hIfc);
 
-unsigned int LoadBios(LDevice* hifc, char *FileName);
-
+unsigned int LoadBios(struct LDevice* hIfc, char *FileName);
 
 typedef struct
 {
@@ -38,7 +37,7 @@ typedef struct
    unsigned int Mode;
 } WASYNC_PAR;
 
-unsigned int IoAsync(LDevice* hifc, WASYNC_PAR* sp);
+unsigned int IoAsync(struct LDevice* hIfc, WASYNC_PAR* sp);
 
 typedef struct
 {
@@ -64,9 +63,8 @@ typedef struct
    unsigned int CFG_REG;
 } SLOT_PAR;
 
-unsigned int GetSlotParam(LDevice* hIfc, SLOT_PAR* slPar);
-
-unsigned int EnableCorrection(LDevice* hIfc, unsigned short Ena);
+unsigned int GetSlotParam(struct LDevice* hIfc, SLOT_PAR* slPar);
+unsigned int EnableCorrection(struct LDevice* hIfc, unsigned short Enabled);
 ''')
 
 _dll = ffi.dlopen("libwlcomp.so")
