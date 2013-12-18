@@ -2,6 +2,7 @@
 
 from bitstring import Bits, BitArray
 from cffi import FFI
+from finalize import track_for_finalization
 
 ffi = FFI()
 
@@ -96,6 +97,15 @@ class LDeviceError(Exception):
         return "LDeviceError: " + self.msg
 
 
+def _close_ldevice(device):
+    print("Close LDevice")
+    try:
+        if _dll.CloseLDevice(device) == L_ERROR:
+            raise LDeviceError("CloseLDevice error")
+    finally:
+        _dll.ReleaseLDevice(device)
+
+
 class LDevice:
     #Обертка над C API
     def __init__(self, slot):
@@ -120,13 +130,9 @@ class LDevice:
             raise LDeviceError("OpenLDevice error")
 
         self._impl = device
+        self._ttl = BitArray(uint=0, length=16, )
 
-    def close(self):
-        try:
-            if _dll.CloseLDevice(self._impl) == L_ERROR:
-                raise LDeviceError("CloseLDevice error")
-        finally:
-            _dll.ReleaseLDevice(self._impl)
+        track_for_finalization(self, self._impl, _close_ldevice)
 
     def plata_test(self):
         return _dll.PlataTest(self._impl) == L_SUCCESS
@@ -168,19 +174,31 @@ class LDevice:
             raise LDeviceError("EnableCorrection error")
 
     #Пользовательские функции
-    def ttl_write(self, bits):
-        assert type(bits) in (Bits, BitArray)
-        assert len(bits) == 16
+    @property
+    def ttl(self):
+        return self._ttl
+
+    def ttl_enable(self, enabled:bool):
+        sp = self.create_WASYNC_PAR()
+        sp.s_Type = L_ASYNC_TTL_CFG
+        sp.Mode = int(enabled)
+        self.io_async(sp)
+
+    def ttl_write(self):
         sp = self.create_WASYNC_PAR()
         sp.s_Type = L_ASYNC_TTL_OUT
-        sp.Data[0] = bits.uint
+        ttl = self._ttl.copy()
+        ttl.reverse()
+        sp.Data[0] = ttl.uint
         self.io_async(sp)
 
     def ttl_read(self):
         sp = self.create_WASYNC_PAR()
         sp.s_Type = L_ASYNC_TTL_INP
         self.io_async(sp)
-        return Bits(uint=sp.Data[0], length=16)
+        ret = BitArray(uint=sp.Data[0], length=16)
+        ret.reverse()
+        return ret
 
     def adc_get(self, num):
         assert (num >= 0) and (num < 16)
@@ -196,30 +214,29 @@ class LDevice:
 def main():
     device = LDevice(0)
 
-    try:
-        print("PlataTest", device.plata_test())
+    print("PlataTest", device.plata_test())
 
-        sp = device.get_slot_param()
+    sp = device.get_slot_param()
 
-        print("Base    ", sp.Base)
-        print("BaseL   ", sp.BaseL)
-        print("Mem     ", sp.Mem)
-        print("MemL    ", sp.MemL)
-        print("Type    ", sp.BoardType)
-        print("DSPType ", sp.DSPType)
-        print("Irq     ", sp.Irq)
+    print("Base    ", sp.Base)
+    print("BaseL   ", sp.BaseL)
+    print("Mem     ", sp.Mem)
+    print("MemL    ", sp.MemL)
+    print("Type    ", sp.BoardType)
+    print("DSPType ", sp.DSPType)
+    print("Irq     ", sp.Irq)
 
-        print(device.ttl_read().bin)
-        print(device.ttl_read()[4])
+    device.ttl_enable(True)
 
-        ttl = BitArray(uint=0, length=16)
-        ttl[5] = 1
-        device.ttl_write(ttl)
+    print(device.ttl_read().bin)
+    print(device.ttl_read()[4])
 
-        device.enable_correction(True)
-        print(device.adc_get(4))
-    finally:
-        device.close()
+    device.ttl[5] = 1
+    device.ttl_write()
+
+    device.enable_correction(True)
+    print(device.adc_get(4))
+
 
 if __name__ == "__main__":
     main()
