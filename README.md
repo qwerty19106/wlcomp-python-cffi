@@ -9,8 +9,8 @@
 http://www.python.org/ftp/python/3.3.3/python-3.3.3.msi
 2. LComp library for Windows
 http://www.lcard.ru/download/lcomp.exe
-3. wlcomp-windows
-https://github.com/qwerty19106/wlcomp-windows
+3. wlcomp library, windows branch
+https://github.com/qwerty19106/wlcomp/tree/windows
 4. python-cffi
 https://pypi.python.org/pypi/cffi
 
@@ -19,8 +19,8 @@ https://pypi.python.org/pypi/cffi
 aptitude install python3.3
 2. LComp library for Linux
 http://www.lcard.ru/download/lcomp_linux.tgz
-3. wlcomp-linux
-https://github.com/qwerty19106/wlcomp-linux
+3. wlcomp library, linux branch
+https://github.com/qwerty19106/wlcomp/tree/linux
 4. python-cffi
 https://pypi.python.org/pypi/cffi
 
