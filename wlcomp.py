@@ -2,7 +2,6 @@
 
 from bitstring import Bits, BitArray
 from cffi import FFI
-from finalize import track_for_finalization
 
 ffi = FFI()
 
@@ -97,23 +96,15 @@ class LDeviceError(Exception):
         return "LDeviceError: " + self.msg
 
 
-def _close_ldevice(device):
-    print("Close LDevice")
-    try:
-        if _dll.CloseLDevice(device) == L_ERROR:
-            raise LDeviceError("CloseLDevice error")
-    finally:
-        _dll.ReleaseLDevice(device)
-
-
 class LDevice:
     #Обертка над C API
     def __init__(self, slot):
+        self._closed = True
         err = ffi.new("unsigned int*")
-        device = _dll.CreateLDevice(0, err)
+        device = _dll.CreateLDevice(slot, err)
         err = err[0]
 
-        if err != L_SUCCESS:
+        if device == ffi.NULL:
             if err == 1:
                 raise LDeviceError("CreateLDevice return L_NOTSUPPORTED")
             elif err == 2:
@@ -129,10 +120,25 @@ class LDevice:
             _dll.ReleaseLDevice(device)
             raise LDeviceError("OpenLDevice error")
 
-        self._impl = device
-        self._ttl = BitArray(uint=0, length=16, )
+        self._closed = False
 
-        track_for_finalization(self, self._impl, _close_ldevice)
+        self._impl = device
+        self._ttl = BitArray(uint=0, length=16)
+
+    def close(self):
+        assert not self._closed
+        self._closed = True
+
+        print("Close LDevice")
+        try:
+            if _dll.CloseLDevice(self._impl) == L_ERROR:
+                raise LDeviceError("CloseLDevice error")
+        finally:
+            _dll.ReleaseLDevice(self._impl)
+
+    def __del__(self):
+        if not self._closed:
+            self.close()
 
     def plata_test(self):
         return _dll.PlataTest(self._impl) == L_SUCCESS
